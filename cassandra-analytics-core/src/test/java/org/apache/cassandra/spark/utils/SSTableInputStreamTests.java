@@ -39,13 +39,13 @@ import org.junit.jupiter.api.Test;
 import org.apache.cassandra.spark.data.FileType;
 import org.apache.cassandra.spark.data.SSTable;
 import org.apache.cassandra.spark.stats.Stats;
-import org.apache.cassandra.spark.utils.streaming.SSTableInputStream;
-import org.apache.cassandra.spark.utils.streaming.SSTableSource;
+import org.apache.cassandra.spark.utils.streaming.BufferingInputStream;
+import org.apache.cassandra.spark.utils.streaming.Source;
 import org.apache.cassandra.spark.utils.streaming.StreamBuffer;
 import org.apache.cassandra.spark.utils.streaming.StreamConsumer;
 import org.jetbrains.annotations.Nullable;
 
-import static org.apache.cassandra.spark.utils.streaming.SSTableInputStream.timeoutLeftNanos;
+import static org.apache.cassandra.spark.utils.streaming.BufferingInputStream.timeoutLeftNanos;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -53,7 +53,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
- * Test the {@link SSTableInputStream} by mocking the {@link SSTableSource}
+ * Test the {@link BufferingInputStream} by mocking the {@link Source}
  */
 public class SSTableInputStreamTests
 {
@@ -72,7 +72,7 @@ public class SSTableInputStreamTests
     {
         runMockedTest(1, 1, DEFAULT_CHUNK_SIZE);
         runMockedTest(1, 5, DEFAULT_CHUNK_SIZE * 5);
-        runMockedTest(10, 10, SSTableSource.DEFAULT_MAX_BUFFER_SIZE);
+        runMockedTest(10, 10, Source.DEFAULT_MAX_BUFFER_SIZE);
         runMockedTest(20, 1024, 33554400L);
         runMockedTest(10, 10, DEFAULT_CHUNK_SIZE * 10);
     }
@@ -82,13 +82,13 @@ public class SSTableInputStreamTests
         void request(long start, long end, StreamConsumer consumer);
     }
 
-    private static SSTableSource<SSTable> buildSource(long size,
-                                                      Long maxBufferSize,
-                                                      Long requestChunkSize,
-                                                      SSTableRequest request,
-                                                      Duration duration)
+    private static Source<SSTable> buildSource(long size,
+                                               Long maxBufferSize,
+                                               Long requestChunkSize,
+                                               SSTableRequest request,
+                                               Duration duration)
     {
-        return new SSTableSource<SSTable>()
+        return new Source<SSTable>()
         {
             public void request(long start, long end, StreamConsumer consumer)
             {
@@ -112,12 +112,12 @@ public class SSTableInputStreamTests
 
             public long maxBufferSize()
             {
-                return maxBufferSize != null ? maxBufferSize : SSTableSource.DEFAULT_MAX_BUFFER_SIZE;
+                return maxBufferSize != null ? maxBufferSize : Source.DEFAULT_MAX_BUFFER_SIZE;
             }
 
             public long chunkBufferSize()
             {
-                return requestChunkSize != null ? requestChunkSize : SSTableSource.DEFAULT_CHUNK_BUFFER_SIZE;
+                return requestChunkSize != null ? requestChunkSize : Source.DEFAULT_CHUNK_BUFFER_SIZE;
             }
 
             public Duration timeout()
@@ -133,14 +133,14 @@ public class SSTableInputStreamTests
         long requestChunkSize = (long) DEFAULT_CHUNK_SIZE * chunksPerRequest;
         long fileSize = requestChunkSize * (long) numRequests;
         AtomicInteger requestCount = new AtomicInteger(0);
-        SSTableSource<SSTable> mockedClient = buildSource(fileSize,
-                                                          maxBufferSize,
-                                                          requestChunkSize,
-                                                          (start, end, consumer) -> {
+        Source<SSTable> mockedClient = buildSource(fileSize,
+                                                   maxBufferSize,
+                                                   requestChunkSize,
+                                                   (start, end, consumer) -> {
             requestCount.incrementAndGet();
             writeBuffers(consumer, randomBuffers(chunksPerRequest));
         }, null);
-        SSTableInputStream<SSTable> is = new SSTableInputStream<>(mockedClient, STATS);
+        BufferingInputStream<SSTable> is = new BufferingInputStream<>(mockedClient, STATS);
         readStreamFully(is);
         assertEquals(numRequests, requestCount.get());
         assertEquals(0L, is.bytesBuffered());
@@ -153,12 +153,12 @@ public class SSTableInputStreamTests
     {
         int chunksPerRequest = 10;
         int numRequests = 10;
-        long length = SSTableSource.DEFAULT_CHUNK_BUFFER_SIZE * chunksPerRequest * numRequests;
+        long length = Source.DEFAULT_CHUNK_BUFFER_SIZE * chunksPerRequest * numRequests;
         AtomicInteger count = new AtomicInteger(0);
-        SSTableSource<SSTable> source = buildSource(length,
-                                                    SSTableSource.DEFAULT_MAX_BUFFER_SIZE,
-                                                    SSTableSource.DEFAULT_CHUNK_BUFFER_SIZE,
-                                                    (start, end, consumer) -> {
+        Source<SSTable> source = buildSource(length,
+                                             Source.DEFAULT_MAX_BUFFER_SIZE,
+                                             Source.DEFAULT_CHUNK_BUFFER_SIZE,
+                                             (start, end, consumer) -> {
             if (count.incrementAndGet() > (numRequests / 2))
             {
                 // Halfway through throw random exception
@@ -170,7 +170,7 @@ public class SSTableInputStreamTests
             }
         }, null);
         assertThrows(IOException.class,
-                     () -> readStreamFully(new SSTableInputStream<>(source, STATS))
+                     () -> readStreamFully(new BufferingInputStream<>(source, STATS))
         );
     }
 
@@ -202,15 +202,15 @@ public class SSTableInputStreamTests
     {
         int chunksPerRequest = 10;
         int numRequests = 10;
-        long length = SSTableSource.DEFAULT_CHUNK_BUFFER_SIZE * chunksPerRequest * numRequests;
+        long length = Source.DEFAULT_CHUNK_BUFFER_SIZE * chunksPerRequest * numRequests;
         AtomicInteger count = new AtomicInteger(0);
         Duration timeout = Duration.ofMillis(1000);
         long startTime = System.nanoTime();
         long sleepTimeInMillis = 100L;
-        SSTableSource<SSTable> source = buildSource(length,
-                                                    SSTableSource.DEFAULT_MAX_BUFFER_SIZE,
-                                                    SSTableSource.DEFAULT_CHUNK_BUFFER_SIZE,
-                                                    (start, end, consumer) -> {
+        Source<SSTable> source = buildSource(length,
+                                             Source.DEFAULT_MAX_BUFFER_SIZE,
+                                             Source.DEFAULT_CHUNK_BUFFER_SIZE,
+                                             (start, end, consumer) -> {
             // Only respond once so future requests will time out
             if (count.incrementAndGet() == 1)
             {
@@ -220,7 +220,7 @@ public class SSTableInputStreamTests
                 });
             }
         }, timeout);
-        SSTableInputStream<SSTable> inputStream = new SSTableInputStream<>(source, STATS);
+        BufferingInputStream<SSTable> inputStream = new BufferingInputStream<>(source, STATS);
         try
         {
             readStreamFully(inputStream);
@@ -245,7 +245,7 @@ public class SSTableInputStreamTests
         int numChunks = 16;
         MutableInt bytesRead = new MutableInt(0);
         MutableInt count = new MutableInt(0);
-        SSTableSource<SSTable> source = new SSTableSource<SSTable>()
+        Source<SSTable> source = new Source<SSTable>()
         {
             @Override
             public void request(long start, long end, StreamConsumer consumer)
@@ -292,7 +292,7 @@ public class SSTableInputStreamTests
 
         int bytesToRead = chunkSize * numChunks;
         long skipAhead = size - bytesToRead + 1;
-        try (SSTableInputStream<SSTable> stream = new SSTableInputStream<>(source, STATS))
+        try (BufferingInputStream<SSTable> stream = new BufferingInputStream<>(source, STATS))
         {
             // Skip ahead so we only read the final chunks
             ByteBufferUtils.skipFully(stream, skipAhead);
@@ -306,7 +306,7 @@ public class SSTableInputStreamTests
     @Test
     public void testSkipToEnd() throws IOException
     {
-        SSTableSource<SSTable> source = new SSTableSource<SSTable>()
+        Source<SSTable> source = new Source<SSTable>()
         {
             @Override
             public void request(long start, long end, StreamConsumer consumer)
@@ -341,7 +341,7 @@ public class SSTableInputStreamTests
             }
         };
 
-        try (SSTableInputStream<SSTable> stream = new SSTableInputStream<>(source, STATS))
+        try (BufferingInputStream<SSTable> stream = new BufferingInputStream<>(source, STATS))
         {
             ByteBufferUtils.skipFully(stream, 20971520);
             readStreamFully(stream);
@@ -368,9 +368,9 @@ public class SSTableInputStreamTests
     }
 
     @SuppressWarnings("StatementWithEmptyBody")
-    private static void readStreamFully(SSTableInputStream<SSTable> inputStream) throws IOException
+    private static void readStreamFully(BufferingInputStream<SSTable> inputStream) throws IOException
     {
-        try (SSTableInputStream<SSTable> in = inputStream)
+        try (BufferingInputStream<SSTable> in = inputStream)
         {
             while (in.read() >= 0)
             {

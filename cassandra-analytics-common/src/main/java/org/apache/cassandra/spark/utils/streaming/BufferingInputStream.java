@@ -31,7 +31,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.cassandra.spark.data.SSTable;
-import org.apache.cassandra.spark.stats.Stats;
+import org.apache.cassandra.spark.stats.IStats;
 import org.apache.cassandra.spark.utils.ThrowableUtils;
 import org.jetbrains.annotations.NotNull;
 
@@ -39,10 +39,10 @@ import org.jetbrains.annotations.NotNull;
  * The InputStream into the CompactionIterator needs to be a blocking {@link java.io.InputStream},
  * but we don't want to block on network calls, or buffer too much data in memory otherwise we will hit OOMs for large Data.db files.
  * <p>
- * This helper class uses the {@link SSTableSource} implementation provided to asynchronously read
+ * This helper class uses the {@link Source} implementation provided to asynchronously read
  * the T bytes on-demand, managing flow control if not ready for more bytes and buffering enough without reading entirely into memory.
  * <p>
- * The generic {@link SSTableSource} allows users to pass in their own implementations to read from any source.
+ * The generic {@link Source} allows users to pass in their own implementations to read from any source.
  * <p>
  * This enables the Bulk Reader library to scale to read many SSTables without OOMing, and controls the flow by
  * buffering more bytes on-demand as the data is drained.
@@ -52,7 +52,7 @@ import org.jetbrains.annotations.NotNull;
  * @param <T> SSTable
  */
 @SuppressWarnings({"WeakerAccess", "unused"})
-public class SSTableInputStream<T extends SSTable> extends InputStream implements StreamConsumer
+public class BufferingInputStream<T extends SSTable> extends InputStream implements StreamConsumer
 {
     private static final StreamBuffer.ByteArrayWrapper END_MARKER = StreamBuffer.wrap(new byte[0]);
     private static final StreamBuffer.ByteArrayWrapper FINISHED_MARKER = StreamBuffer.wrap(new byte[0]);
@@ -68,8 +68,8 @@ public class SSTableInputStream<T extends SSTable> extends InputStream implement
     }
 
     private final BlockingQueue<StreamBuffer> queue;
-    private final SSTableSource<T> source;
-    private final Stats stats;
+    private final Source<T> source;
+    private final IStats<T> stats;
     private final long startTimeNanos;
 
     // Variables accessed by both producer, consumer & timeout thread so must be volatile or atomic
@@ -89,11 +89,11 @@ public class SSTableInputStream<T extends SSTable> extends InputStream implement
     private int length;
 
     /**
-     * @param source SSTableSource to async provide the bytes after {@link SSTableSource#request(long, long, StreamConsumer)} is called
+     * @param source SSTableSource to async provide the bytes after {@link Source#request(long, long, StreamConsumer)} is called
      *
-     * @param stats {@link Stats} implementation for recording instrumentation
+     * @param stats {@link IStats} implementation for recording instrumentation
      */
-    public SSTableInputStream(SSTableSource<T> source, Stats stats)
+    public BufferingInputStream(Source<T> source, IStats<T> stats)
     {
         this.source = source;
         this.queue = new LinkedBlockingQueue<>();
@@ -162,7 +162,7 @@ public class SSTableInputStream<T extends SSTable> extends InputStream implement
     }
 
     /**
-     * Request more bytes using {@link SSTableSource#request(long, long, StreamConsumer)} for the next range
+     * Request more bytes using {@link Source#request(long, long, StreamConsumer)} for the next range
      */
     private void requestMore()
     {
@@ -193,7 +193,7 @@ public class SSTableInputStream<T extends SSTable> extends InputStream implement
     }
 
     /**
-     * The number of bytes buffered is greater than or equal to {@link SSTableSource#maxBufferSize()}
+     * The number of bytes buffered is greater than or equal to {@link Source#maxBufferSize()}
      * so wait for queue to drain before requesting more
      *
      * @return true if queue is full
@@ -452,7 +452,7 @@ public class SSTableInputStream<T extends SSTable> extends InputStream implement
     // Internal Methods for java.io.InputStream
 
     /**
-     * If position >= length, we have finished with this {@link SSTableInputStream#currentBuffer} so release and
+     * If position >= length, we have finished with this {@link BufferingInputStream#currentBuffer} so release and
      * move to the State {@link StreamState#NextBuffer} so next buffer is popped from the {@link LinkedBlockingQueue}
      * when {@link InputStream#read()} or {@link InputStream#read(byte[], int, int)} is next called
      */

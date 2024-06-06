@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
 import org.apache.cassandra.spark.stats.Stats;
 import org.apache.cassandra.spark.utils.IOUtils;
 import org.apache.cassandra.spark.utils.ThrowableUtils;
-import org.apache.cassandra.spark.utils.streaming.SSTableInputStream;
+import org.apache.cassandra.spark.utils.streaming.BufferingInputStream;
 import org.jetbrains.annotations.Nullable;
 
 public class FileSystemSSTable extends SSTable
@@ -64,7 +64,7 @@ public class FileSystemSSTable extends SSTable
         try
         {
             return useSSTableInputStream
-                   ? new SSTableInputStream<>(new FileSystemSource(this, fileType, filePath), stats.get())
+                   ? new BufferingInputStream<>(new FileSystemSource(this, fileType, filePath), stats.get())
                    : new BufferedInputStream(new FileInputStream(filePath.toFile()));
         }
         catch (FileNotFoundException exception)

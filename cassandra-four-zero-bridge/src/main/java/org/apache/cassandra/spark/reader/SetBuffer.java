@@ -17,30 +17,20 @@
  * under the License.
  */
 
-package org.apache.cassandra.bridge;
+package org.apache.cassandra.spark.reader;
 
-import org.apache.cassandra.db.rows.CellPath;
+import org.apache.cassandra.db.rows.Cell;
 
-public final class CollectionElement
+public class SetBuffer extends ComplexTypeBuffer
 {
-    // The path to store the value in the collection, consider it as the key
-    public final CellPath cellPath;
-    // The value to be stored in the collection
-    public final Object value;
-
-    private CollectionElement(CellPath cellPath, Object value)
+    SetBuffer(int cellCount)
     {
-        this.cellPath = cellPath;
-        this.value = value;
+        super(cellCount, cellCount);
     }
 
-    public static CollectionElement living(CellPath cellPath, Object value)
+    @Override
+    void addCell(Cell cell)
     {
-        return new CollectionElement(cellPath, value);
-    }
-
-    public static CollectionElement deleted(CellPath cellPath)
-    {
-        return new CollectionElement(cellPath, null);
+        add(cell.path().get(0));  // Set - copy over key
     }
 }

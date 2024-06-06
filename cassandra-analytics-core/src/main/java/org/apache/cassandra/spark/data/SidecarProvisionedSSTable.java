@@ -39,8 +39,8 @@ import org.apache.cassandra.sidecar.client.SidecarClient;
 import org.apache.cassandra.sidecar.client.SidecarInstance;
 import org.apache.cassandra.spark.stats.Stats;
 import org.apache.cassandra.spark.utils.ThrowableUtils;
-import org.apache.cassandra.spark.utils.streaming.SSTableInputStream;
-import org.apache.cassandra.spark.utils.streaming.SSTableSource;
+import org.apache.cassandra.spark.utils.streaming.BufferingInputStream;
+import org.apache.cassandra.spark.utils.streaming.Source;
 import org.apache.cassandra.spark.utils.streaming.StreamConsumer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -171,8 +171,8 @@ public class SidecarProvisionedSSTable extends SSTable
 
     public InputStream open(ListSnapshotFilesResponse.FileInfo fileInfo, FileType fileType)
     {
-        SSTableSource<SidecarProvisionedSSTable> ssTableSource = source(fileInfo, fileType);
-        return new SSTableInputStream<>(ssTableSource, stats);
+        Source<SidecarProvisionedSSTable> ssTableSource = source(fileInfo, fileType);
+        return new BufferingInputStream<>(ssTableSource, stats);
     }
 
     /**
@@ -182,10 +182,10 @@ public class SidecarProvisionedSSTable extends SSTable
      * @param fileType SSTable file type
      * @return an SSTableSource implementation that uses Sidecar client to request bytes
      */
-    private SSTableSource<SidecarProvisionedSSTable> source(ListSnapshotFilesResponse.FileInfo fileInfo, FileType fileType)
+    private Source<SidecarProvisionedSSTable> source(ListSnapshotFilesResponse.FileInfo fileInfo, FileType fileType)
     {
         SidecarProvisionedSSTable thisSSTable = this;
-        return new SSTableSource<SidecarProvisionedSSTable>()
+        return new Source<SidecarProvisionedSSTable>()
         {
             @Override
             public void request(long start, long end, StreamConsumer consumer)

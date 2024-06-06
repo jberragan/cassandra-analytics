@@ -31,11 +31,11 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.cassandra.spark.utils.streaming.SSTableSource;
+import org.apache.cassandra.spark.utils.streaming.Source;
 import org.apache.cassandra.spark.utils.streaming.StreamBuffer;
 import org.apache.cassandra.spark.utils.streaming.StreamConsumer;
 
-class FileSystemSource implements SSTableSource<FileSystemSSTable>, AutoCloseable
+class FileSystemSource implements Source<FileSystemSSTable>, AutoCloseable
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(FileSystemSource.class);
     static final ExecutorService FILE_IO_EXECUTOR =

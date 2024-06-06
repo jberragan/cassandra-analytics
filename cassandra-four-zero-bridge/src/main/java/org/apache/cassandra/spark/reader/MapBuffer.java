@@ -17,28 +17,21 @@
  * under the License.
  */
 
-package org.apache.cassandra.bridge;
+package org.apache.cassandra.spark.reader;
 
-public class RangeTombstone
+import org.apache.cassandra.db.rows.Cell;
+
+public class MapBuffer extends ComplexTypeBuffer
 {
-    public final Bound open;
-    public final Bound close;
-
-    public RangeTombstone(Bound open, Bound close)
+    MapBuffer(int cellCount)
     {
-        this.open = open;
-        this.close = close;
+        super(cellCount, cellCount * 2);
     }
 
-    public static class Bound
+    @Override
+    void addCell(Cell cell)
     {
-        public final Object[] values;
-        public final boolean inclusive;
-
-        public Bound(Object[] values, boolean inclusive)
-        {
-            this.values = values;
-            this.inclusive = inclusive;
-        }
+        add(cell.path().get(0));  // Map - copy over key and value
+        super.addCell(cell);
     }
 }

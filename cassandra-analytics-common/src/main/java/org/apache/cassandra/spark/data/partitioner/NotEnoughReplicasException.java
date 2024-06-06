@@ -20,7 +20,7 @@
 package org.apache.cassandra.spark.data.partitioner;
 
 import java.math.BigInteger;
-import javax.validation.constraints.NotNull;
+import org.jetbrains.annotations.NotNull;
 
 import com.google.common.collect.Range;
 

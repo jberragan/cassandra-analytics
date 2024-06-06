@@ -20,18 +20,46 @@
 package org.apache.cassandra.spark.utils;
 
 import java.nio.ByteBuffer;
-import java.util.Arrays;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
+import io.netty.util.concurrent.FastThreadLocal;
 import org.apache.cassandra.spark.data.CqlField;
 
-public final class ColumnTypes
+public final class ColumnTypes extends BaseColumnTypes
 {
-    private static final int STATIC_MARKER = 0xFFFF;
 
     private ColumnTypes()
     {
         throw new IllegalStateException(getClass() + " is static utility class and shall not be instantiated");
+    }
+
+    private final static FastThreadLocal<CharsetDecoder> UTF8_DECODER = new FastThreadLocal<>()
+    {
+        @Override
+        protected CharsetDecoder initialValue()
+        {
+            return StandardCharsets.UTF_8.newDecoder();
+        }
+    };
+
+    public static String string(ByteBuffer buffer) throws CharacterCodingException
+    {
+        return ByteBufferUtils.string(buffer, ColumnTypes.UTF8_DECODER::get);
+    }
+
+    public static String stringThrowRuntime(ByteBuffer buffer)
+    {
+        try
+        {
+            return string(buffer);
+        }
+        catch (final CharacterCodingException e)
+        {
+            throw new RuntimeException(e);
+        }
     }
 
     public static ByteBuffer buildPartitionKey(List<CqlField> partitionKeys, Object... values)
@@ -64,7 +92,7 @@ public final class ColumnTypes
         ByteBuffer out = ByteBuffer.allocate(totalLength);
         if (isStatic)
         {
-            out.putShort((short) STATIC_MARKER);
+            out.putShort((short) ByteBufferUtils.STATIC_MARKER);
         }
 
         for (ByteBuffer buffer : buffers)
@@ -75,56 +103,5 @@ public final class ColumnTypes
         }
         out.flip();
         return out;
-    }
-
-    // Extract component position from buffer; return null if there are not enough components
-    public static ByteBuffer extractComponent(ByteBuffer buffer, int position)
-    {
-        buffer = buffer.duplicate();
-        readStatic(buffer);
-        int index = 0;
-        while (buffer.remaining() > 0)
-        {
-            ByteBuffer c = ByteBufferUtils.readBytesWithShortLength(buffer);
-            if (index == position)
-            {
-                return c;
-            }
-
-            buffer.get();  // Skip end-of-component
-            ++index;
-        }
-        return null;
-    }
-
-    public static ByteBuffer[] split(ByteBuffer name, int numKeys)
-    {
-        // Assume all components, we'll trunk the array afterwards if need be, but most names will be complete
-        ByteBuffer[] l = new ByteBuffer[numKeys];
-        ByteBuffer buffer = name.duplicate();
-        ColumnTypes.readStatic(buffer);
-        int index = 0;
-        while (buffer.remaining() > 0)
-        {
-            l[index++] = ByteBufferUtils.readBytesWithShortLength(buffer);
-            buffer.get();  // Skip end-of-component
-        }
-        return index == l.length ? l : Arrays.copyOfRange(l, 0, index);
-    }
-
-    public static void readStatic(ByteBuffer buffer)
-    {
-        if (buffer.remaining() < 2)
-        {
-            return;
-        }
-
-        int header = ByteBufferUtils.peekShortLength(buffer, buffer.position());
-        if ((header & 0xFFFF) != STATIC_MARKER)
-        {
-            return;
-        }
-
-        ByteBufferUtils.readShortLength(buffer);  // Skip header
     }
 }

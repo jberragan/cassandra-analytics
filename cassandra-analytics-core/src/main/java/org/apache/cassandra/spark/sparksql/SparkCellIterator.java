@@ -38,7 +38,6 @@ import org.apache.cassandra.spark.reader.StreamScanner;
 import org.apache.cassandra.spark.sparksql.filters.PartitionKeyFilter;
 import org.apache.cassandra.spark.sparksql.filters.PruneColumnFilter;
 import org.apache.cassandra.spark.stats.Stats;
-import org.apache.cassandra.spark.utils.ByteBufferUtils;
 import org.apache.cassandra.spark.utils.ColumnTypes;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
@@ -191,7 +190,7 @@ public class SparkCellIterator implements Iterator<Cell>, AutoCloseable
 
             // Deserialize CQL field column name
             ByteBuffer component = ColumnTypes.extractComponent(columnNameBuf, cqlTable.numClusteringKeys());
-            String columnName = component != null ? ByteBufferUtils.stringThrowRuntime(component) : null;
+            String columnName = component != null ? ColumnTypes.stringThrowRuntime(component) : null;
             if (columnName == null || columnName.isEmpty())
             {
                 if (!hasProjectedValueColumns || !scanner.hasMoreColumns())

@@ -30,7 +30,7 @@ import org.jetbrains.annotations.Nullable;
  *
  * @param <T> SSTable type
  */
-public interface SSTableSource<T extends SSTable>
+public interface Source<T extends SSTable>
 {
     long DEFAULT_MAX_BUFFER_SIZE = 6291460L;
     long DEFAULT_CHUNK_BUFFER_SIZE = 4194300L;
@@ -71,7 +71,7 @@ public interface SSTableSource<T extends SSTable>
     }
 
     /**
-     * @return the chunk size in bytes requested when {@link SSTableSource#request(long, long, StreamConsumer)} is called
+     * @return the chunk size in bytes requested when {@link Source#request(long, long, StreamConsumer)} is called
      */
     default long chunkBufferSize()
     {

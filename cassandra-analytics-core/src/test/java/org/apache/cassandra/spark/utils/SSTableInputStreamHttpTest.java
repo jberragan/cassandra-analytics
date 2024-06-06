@@ -46,8 +46,8 @@ import org.slf4j.LoggerFactory;
 import com.sun.net.httpserver.HttpServer;
 import org.apache.cassandra.spark.data.FileType;
 import org.apache.cassandra.spark.data.SSTable;
-import org.apache.cassandra.spark.utils.streaming.SSTableInputStream;
-import org.apache.cassandra.spark.utils.streaming.SSTableSource;
+import org.apache.cassandra.spark.utils.streaming.BufferingInputStream;
+import org.apache.cassandra.spark.utils.streaming.Source;
 import org.apache.cassandra.spark.utils.streaming.StreamBuffer;
 import org.apache.cassandra.spark.utils.streaming.StreamConsumer;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -61,8 +61,8 @@ import static org.quicktheories.QuickTheory.qt;
 import static org.quicktheories.generators.SourceDSL.arbitrary;
 
 /**
- * Test the {@link SSTableInputStream} by firing up an in-test HTTP server and reading the files with an HTTP client
- * Compares the MD5s to verify file bytes match bytes returned by {@link SSTableInputStream}.
+ * Test the {@link BufferingInputStream} by firing up an in-test HTTP server and reading the files with an HTTP client
+ * Compares the MD5s to verify file bytes match bytes returned by {@link BufferingInputStream}.
  */
 public class SSTableInputStreamHttpTest
 {
@@ -163,12 +163,12 @@ public class SSTableInputStreamHttpTest
     }
 
     // HTTP client source for reading SSTable from HTTP server
-    private static SSTableSource<SSTable> buildHttpSource(String filename,
-                                                          long size,
-                                                          Long maxBufferSize,
-                                                          Long chunkBufferSize)
+    private static Source<SSTable> buildHttpSource(String filename,
+                                                   long size,
+                                                   Long maxBufferSize,
+                                                   Long chunkBufferSize)
     {
-        return new SSTableSource<SSTable>()
+        return new Source<SSTable>()
         {
             public void request(long start, long end, StreamConsumer consumer)
             {
@@ -213,12 +213,12 @@ public class SSTableInputStreamHttpTest
 
             public long maxBufferSize()
             {
-                return maxBufferSize != null ? maxBufferSize : SSTableSource.super.maxBufferSize();
+                return maxBufferSize != null ? maxBufferSize : Source.super.maxBufferSize();
             }
 
             public long chunkBufferSize()
             {
-                return chunkBufferSize != null ? chunkBufferSize : SSTableSource.super.chunkBufferSize();
+                return chunkBufferSize != null ? chunkBufferSize : Source.super.chunkBufferSize();
             }
 
             public SSTable sstable()
@@ -286,11 +286,11 @@ public class SSTableInputStreamHttpTest
             // Use HTTP client source to read files across HTTP and verify MD5 matches expected
             byte[] actualMD5;
             long blockingTimeMillis;
-            SSTableSource<SSTable> source = buildHttpSource(path.getFileName().toString(),
-                                                            Files.size(path),
-                                                            maxBufferSize,
-                                                            chunkBufferSize);
-            try (SSTableInputStream<SSTable> is = new SSTableInputStream<>(source, SSTableInputStreamTests.STATS))
+            Source<SSTable> source = buildHttpSource(path.getFileName().toString(),
+                                                     Files.size(path),
+                                                     maxBufferSize,
+                                                     chunkBufferSize);
+            try (BufferingInputStream<SSTable> is = new BufferingInputStream<>(source, SSTableInputStreamTests.STATS))
             {
                 actualMD5 = DigestUtils.md5(is);
                 blockingTimeMillis = TimeUnit.MILLISECONDS.convert(is.timeBlockedNanos(), TimeUnit.NANOSECONDS);

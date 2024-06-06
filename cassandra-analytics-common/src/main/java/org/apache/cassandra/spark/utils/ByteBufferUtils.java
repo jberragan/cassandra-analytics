@@ -30,20 +30,13 @@ import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
-
-import io.netty.util.concurrent.FastThreadLocal;
+import java.util.function.Supplier;
 
 public final class ByteBufferUtils
 {
+    public static final ThreadLocal<CharsetDecoder> UTF8_DECODER_PROVIDER = ThreadLocal.withInitial(StandardCharsets.UTF_8::newDecoder);
+    public static final int STATIC_MARKER = 0xFFFF;
     private static final String EMPTY_STRING = "";
-    private static final FastThreadLocal<CharsetDecoder> UTF8_DECODER = new FastThreadLocal<CharsetDecoder>()
-    {
-        @Override
-        protected CharsetDecoder initialValue()
-        {
-            return StandardCharsets.UTF_8.newDecoder();
-        }
-    };
     private static final char[] HEX_ARRAY = "0123456789ABCDEF".toCharArray();
 
     private ByteBufferUtils()
@@ -93,25 +86,26 @@ public final class ByteBufferUtils
         return bytes;
     }
 
-    public static String stringThrowRuntime(ByteBuffer buffer)
-    {
-        try
-        {
-            return ByteBufferUtils.string(buffer);
-        }
-        catch (CharacterCodingException exception)
-        {
-            throw new RuntimeException(exception);
-        }
-    }
-
-    public static String string(ByteBuffer buffer) throws CharacterCodingException
+    /**
+     * Decode ByteBuffer into String using provided CharsetDecoder.
+     *
+     * @param buffer          byte buffer
+     * @param decoderSupplier let the user provide their own CharsetDecoder provider e.g. using io.netty.util.concurrent.FastThreadLocal over java.lang.ThreadLocal
+     * @return decoded string
+     * @throws CharacterCodingException charset decoding exception
+     */
+    public static String string(ByteBuffer buffer, Supplier<CharsetDecoder> decoderSupplier) throws CharacterCodingException
     {
         if (buffer.remaining() <= 0)
         {
             return EMPTY_STRING;
         }
-        return UTF8_DECODER.get().decode(buffer.duplicate()).toString();
+        return decoderSupplier.get().decode(buffer.duplicate()).toString();
+    }
+
+    public static String string(final ByteBuffer buffer) throws CharacterCodingException
+    {
+        return string(buffer, UTF8_DECODER_PROVIDER::get);
     }
 
     private static String toHexString(byte[] bytes, int length)
@@ -221,5 +215,21 @@ public final class ByteBufferUtils
         {
             throw new EOFException("EOF after " + skipped + " bytes out of " + length);
         }
+    }
+
+    public static void readStatic(ByteBuffer buffer)
+    {
+        if (buffer.remaining() < 2)
+        {
+            return;
+        }
+
+        int header = peekShortLength(buffer, buffer.position());
+        if ((header & 0xFFFF) != STATIC_MARKER)
+        {
+            return;
+        }
+
+        readShortLength(buffer);  // Skip header
     }
 }
