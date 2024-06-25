@@ -24,6 +24,7 @@ import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.util.Random;
 import java.util.UUID;
+import java.util.stream.IntStream;
 
 import com.google.common.net.InetAddresses;
 
@@ -32,6 +33,7 @@ import org.apache.cassandra.spark.data.partitioner.Partitioner;
 
 public final class RandomUtils
 {
+    private static final String ALPHANUMERIC = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
     private static final int MIN_COLLECTION_SIZE = 16;
 
     public static final Random RANDOM = new Random();
@@ -81,7 +83,7 @@ public final class RandomUtils
 
     /**
      * Returns a random Type 1 (time-based) UUID.
-     *
+     * <p>
      * Since Java does not natively support creation of Type 1 (time-based) UUIDs, and in order to avoid introducing
      * a dependency on {@code org.apache.cassandra.utils.UUIDGen}, we obtain a Type 4 (random) UUID and "fix" it.
      *
@@ -90,7 +92,7 @@ public final class RandomUtils
     public static UUID getRandomTimeUUIDForTesting()
     {
         UUID uuid = UUID.randomUUID();
-        return new UUID(uuid.getMostSignificantBits()  ^ 0x0000000000005000L,   // Change UUID version from 4 to 1
+        return new UUID(uuid.getMostSignificantBits() ^ 0x0000000000005000L,   // Change UUID version from 4 to 1
                         uuid.getLeastSignificantBits() | 0x0000010000000000L);  // Always set multicast bit to 1
     }
 
@@ -103,5 +105,14 @@ public final class RandomUtils
     public static Object randomValue(CqlField.CqlType type)
     {
         return type.randomValue(MIN_COLLECTION_SIZE);
+    }
+
+    public static String randomAlphanumeric(int len)
+    {
+        StringBuilder sb = new StringBuilder();
+        IntStream.rangeClosed(0, len)
+                 .mapToObj(i -> ALPHANUMERIC.charAt(RANDOM.nextInt(len)))
+                 .forEach(sb::append);
+        return sb.toString();
     }
 }

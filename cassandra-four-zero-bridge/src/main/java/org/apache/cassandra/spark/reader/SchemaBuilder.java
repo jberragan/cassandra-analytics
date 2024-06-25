@@ -62,11 +62,12 @@ import org.apache.cassandra.schema.TableId;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.schema.TableMetadataRef;
 import org.apache.cassandra.schema.Types;
+import org.apache.cassandra.spark.data.CassandraTypes;
 import org.apache.cassandra.spark.data.CqlField;
 import org.apache.cassandra.spark.data.CqlTable;
 import org.apache.cassandra.spark.data.ReplicationFactor;
-import org.apache.cassandra.spark.data.complex.CqlFrozen;
-import org.apache.cassandra.spark.data.complex.CqlUdt;
+import org.apache.cassandra.spark.data.types.complex.CqlFrozen;
+import org.apache.cassandra.spark.data.types.complex.CqlUdt;
 import org.apache.cassandra.spark.data.partitioner.Partitioner;
 import org.apache.cassandra.utils.Pair;
 import org.jetbrains.annotations.NotNull;
@@ -119,7 +120,7 @@ public class SchemaBuilder
                          String keyspace,
                          ReplicationFactor replicationFactor,
                          Partitioner partitioner,
-                         Function<CassandraBridge, Set<String>> udtStatementsProvider,
+                         Function<CassandraTypes, Set<String>> udtStatementsProvider,
                          @Nullable UUID tableId,
                          int indexCount)
     {
@@ -132,7 +133,7 @@ public class SchemaBuilder
         Pair<KeyspaceMetadata, TableMetadata> updated = CassandraSchema.apply(schema ->
                 updateSchema(schema,
                              this.keyspace,
-                             udtStatementsProvider.apply(bridge),
+                             udtStatementsProvider.apply(bridge.cassandraTypes()),
                              this.createStmt,
                              partitioner,
                              this.replicationFactor,
@@ -220,7 +221,7 @@ public class SchemaBuilder
 
         if (cqlType instanceof CQL3Type.Native)
         {
-            CqlField.CqlType type = bridge.parseType(cqlType.toString());
+            CqlField.CqlType type = bridge.cassandraTypes().parseType(cqlType.toString());
             if (!type.isSupported())
             {
                 throw new UnsupportedOperationException(type.name() + " data type is not supported");
@@ -455,7 +456,7 @@ public class SchemaBuilder
             for (int field = 0; field < userType.size(); field++)
             {
                 builder.withField(userType.fieldName(field).toString(),
-                                  bridge.parseType(userType.fieldType(field).asCQL3Type().toString(), udts));
+                                  bridge.cassandraTypes().parseType(userType.fieldType(field).asCQL3Type().toString(), udts));
             }
             udts.put(name, builder.build());
         }
@@ -522,7 +523,7 @@ public class SchemaBuilder
             boolean isStatic = col.isStatic();
             String name = col.name.toString();
             CqlField.CqlType type = col.type.isUDT() ? udts.get(((UserType) col.type).getNameAsString())
-                                                     : bridge.parseType(col.type.asCQL3Type().toString(), udts);
+                                                     : bridge.cassandraTypes().parseType(col.type.asCQL3Type().toString(), udts);
             boolean isFrozen = col.type.isFreezable() && !col.type.isMultiCell();
             result.add(new CqlField(isPartitionKey,
                                     isClusteringColumn,

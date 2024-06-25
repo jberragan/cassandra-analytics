@@ -169,7 +169,7 @@ public final class TestUtils
                                            .option("version", version.toString())
                                            .option("useSSTableInputStream", true) // use in the test system to test the SSTableInputStream
                                            .option("partitioner", partitioner.name())
-                                           .option("udts", udts.stream().map(f -> f.createStatement(bridge, keyspace)).collect(Collectors.joining("\n")));
+                                           .option("udts", udts.stream().map(f -> f.createStatement(bridge.cassandraTypes(), keyspace)).collect(Collectors.joining("\n")));
         if (statsClass != null)
         {
             frameReader = frameReader.option("statsClass", statsClass);
@@ -209,7 +209,7 @@ public final class TestUtils
                                            .option("partitioner", partitioner.name())
                                            .option(SchemaFeatureSet.LAST_MODIFIED_TIMESTAMP.optionName(), addLastModifiedTimestampColumn)
                                            .option("udts", udts.stream()
-                                                               .map(udt -> udt.createStatement(bridge, keyspace))
+                                                               .map(udt -> udt.createStatement(bridge.cassandraTypes(), keyspace))
                                                                .collect(Collectors.joining("\n")));
         if (statsClass != null)
         {

@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test;
 
 import org.apache.cassandra.bridge.CassandraBridgeImplementation;
 import org.apache.cassandra.serializers.SimpleDateSerializer;
+import org.apache.cassandra.spark.data.converter.types.Date;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -39,7 +40,7 @@ public class DateTypeTests
         int cassandraDate = SimpleDateSerializer.dateStringToDays("2021-07-16");
         assertTrue(cassandraDate < 0);
         assertEquals("2021-07-16", SimpleDateSerializer.instance.toString(cassandraDate));
-        Object sparkSqlDate = Date.INSTANCE.toSparkSqlType(cassandraDate, false);
+        Object sparkSqlDate = org.apache.cassandra.spark.data.converter.types.Date.INSTANCE.toSparkSqlType(cassandraDate, false);
         assertTrue(sparkSqlDate instanceof Integer);
         int numDays = (int) sparkSqlDate;
         assertTrue(numDays > 0);
@@ -48,7 +49,7 @@ public class DateTypeTests
         assertEquals(2021, end.getYear());
         assertEquals(7, end.getMonthValue());
         assertEquals(16, end.getDayOfMonth());
-        Object cqlWriterObj = Date.INSTANCE.convertForCqlWriter(numDays, BRIDGE.getVersion());
+        Object cqlWriterObj = Date.INSTANCE.cqlType().convertForCqlWriter(numDays, BRIDGE.getVersion());
         org.apache.cassandra.cql3.functions.types.LocalDate cqlWriterDate = (org.apache.cassandra.cql3.functions.types.LocalDate) cqlWriterObj;
         assertEquals(2021, cqlWriterDate.getYear());
         assertEquals(7, cqlWriterDate.getMonth());

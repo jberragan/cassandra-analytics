@@ -507,9 +507,8 @@ public class DataTypeSerializationTests
                 Map<Object, Object> actual = new HashMap<>(keys.numElements());
                 for (int index = 0; index < keys.numElements(); index++)
                 {
-                    Object key = keyType.toTestRowType(keys.get(index, keyType.sparkSqlType(BigNumberConfig.DEFAULT)));
-                    Object value = valueType.toTestRowType(values.get(index,
-                                                                      valueType.sparkSqlType(BigNumberConfig.DEFAULT)));
+                    Object key = keyType.toTestRowType(keys.get(index, bridge.typeConverter().sparkSqlType(keyType)));
+                    Object value = valueType.toTestRowType(values.get(index, bridge.typeConverter().sparkSqlType(valueType)));
                     actual.put(key, value);
                 }
                 assertEquals(expected.size(), actual.size());
@@ -534,7 +533,7 @@ public class DataTypeSerializationTests
                 Map<String, Object> expected = (Map<String, Object>) RandomUtils.randomValue(udt);
                 assert expected != null;
                 ByteBuffer buffer = udt.serializeUdt(expected);
-                Map<String, Object> actual = udt.deserializeUdt(buffer, false);
+                Map<String, Object> actual = udt.deserializeUdt(bridge.typeConverter(), buffer, false);
                 assertEquals(expected.size(), actual.size());
                 for (Map.Entry<String, Object> entry : expected.entrySet())
                 {
